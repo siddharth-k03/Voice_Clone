@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Cloning and TTS</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Record Your Voice</h1>
+        <div class="script">
+            <h2>Script</h2>
+            <p>This is a test paragraph to demonstrate the cloned voice capabilities. Please read this text aloud in a clear and steady manner. Your voice recording will be used to create a clone.</p>
+        </div>
+        <div class="buttons">
+            <button id="record-button">Start Recording</button>
+            <button id="stop-button" disabled>Stop Recording</button>
+        </div>
+        <div class="notification" id="notification">
+            <p>Your voice clone has been created! Listen to the result below:</p>
+        </div>
+        <h2>Voice Clone Result</h2>
+        <audio id="tts-audio" controls></audio>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        document.getElementById('record-button').addEventListener('click', async function() {
+            audioChunks = [];
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('record-button').disabled = true;
+            document.getElementById('stop-button').disabled = false;
+        });
+
+        document.getElementById('stop-button').addEventListener('click', async function() {
+            mediaRecorder.stop();
+
+            mediaRecorder.onstop = async function() {
+                document.getElementById('record-button').disabled = false;
+                document.getElementById('stop-button').disabled = true;
+                
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('file', blob, 'recording.webm');
+                
+                const response = await fetch('/clone/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                const audioElement = document.getElementById('tts-audio');
+                const notification = document.getElementById('notification');
+
+                if (response.ok) {
+                    audioElement.src = result.audio_url;
+                    audioElement.load();
+                    notification.style.display = 'block';
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            };
+        });
+    </script>
+</body>
+</html>
